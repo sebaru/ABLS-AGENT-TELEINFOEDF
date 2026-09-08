@@ -7,7 +7,7 @@ After=network-online.target
 Type=simple
 ExecStart=/usr/bin/abls-agent-teleinfoedf --agent-tech-id=%i
 DynamicUser=yes
-SupplementaryGroups=abls
+SupplementaryGroups=abls dialout
 Restart=on-failure
 RestartSec=5s
 
