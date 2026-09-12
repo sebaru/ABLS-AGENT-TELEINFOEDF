@@ -8,6 +8,8 @@ Type=simple
 ExecStart=/usr/bin/abls-agent-teleinfoedf --agent-tech-id=%i
 DynamicUser=yes
 SupplementaryGroups=abls dialout
+StateDirectory=abls-agent-teleinfoedf/%i
+WorkingDirectory=%S/abls-agent-teleinfoedf/%i
 Restart=on-failure
 RestartSec=5s
 
