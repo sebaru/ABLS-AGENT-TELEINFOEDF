@@ -50,13 +50,13 @@
   { struct termios oldtio;
     gchar *port = Agent_config_get_string( Agent, "port" );
     if (!port)
-     { Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR, "Missing required config key 'port'");
+     { Info(__func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR, "Missing required config key 'port'");
        return(-1);
      }
 
     gint fd = open(port, O_RDONLY | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
     if (fd < 0) {
-      Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR,
+      Info(__func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR,
            "Unable to open teleinfo port '%s': %s", port, strerror(errno));
       return(-1);
     }
@@ -73,7 +73,7 @@
     tcflush(fd, TCIOFLUSH);
 
     Agent_vars->fd = fd;
-    Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_NOTICE, "Teleinfo port opened: %s", port);
+    Info(__func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_NOTICE, "Teleinfo port opened: %s", port);
     return(fd);
   }
 /******************************************************************************************************************************/
@@ -198,11 +198,11 @@
   { Config_add_parameter ( "port", "port (/dev/)", "Port of the teleinfo device", CONFIG_STRING );
     Config_add_parameter ( "standard", "mode standard", "Mode standard for the teleinfo device", CONFIG_BOOL );
     Agent = Agent_init(argv[0], "teleinfoedf", ABLS_AGENT_TELEINFOEDF_VERSION, sizeof(struct ABLS_TELEINFOEDF_VARS), argc, argv);
-    Agent_vars = Agent->vars;
+    Agent_vars = Agent_get_vars ( Agent );
 
     gchar *port = Agent_config_get_string( Agent, "port" );
     if (!port)
-     { Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR, "Missing required config key 'port'");
+     { Info(__func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR, "Missing required config key 'port'");
        Agent_end(Agent);
      }
 
@@ -215,13 +215,13 @@
 
     TeleinfoEDF_create_IO();
 
-    Mqtt_subscribe(Agent->mqtt_local, "SET_DO/%s/#", Agent->agent_tech_id);
-    Mqtt_subscribe(Agent->mqtt_local, "SET_AO/%s/#", Agent->agent_tech_id);
-    Mqtt_subscribe(Agent->mqtt_local, "SYNC_INPUT/%s", Agent->agent_tech_id);
+    Agent_subscribe_mqtt_local ( Agent, "SET_DO/%s/#", Agent_get_tech_id ( Agent ));
+    Agent_subscribe_mqtt_local ( Agent, "SET_AO/%s/#", Agent_get_tech_id ( Agent ));
+    Agent_subscribe_mqtt_local ( Agent, "SYNC_INPUT/%s", Agent_get_tech_id ( Agent ));
 
     Agent_is_ready (Agent);
 
-    while (Agent->Agent_run == AGENT_IS_RUNNING)
+    while (Agent_is_running ( Agent ))
      { Agent_loop ( Agent );
 /****************************************************** Ecoute du master ******************************************************/
        JsonNode *mqtt_local_message;
@@ -231,28 +231,28 @@
 /****************************************************** Ecoute de l'api *******************************************************/
        JsonNode *mqtt_api_message;
        while ( (mqtt_api_message = Agent_get_mqtt_api_message ( Agent ) ) != NULL )
-        { if ( Mqtt_topic_is ( mqtt_api_message, 4, "+", "AGENT", Agent->agent_tech_id, "TEST" ) )
-           { Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_NOTICE, "Agent Test from API."); }
+        { if ( Mqtt_topic_is ( mqtt_api_message, 4, "+", "AGENT", Agent_get_tech_id ( Agent ), "TEST" ) )
+           { Info(__func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_NOTICE, "Agent Test from API."); }
           Json_unref (mqtt_api_message);
         }
 /************************************************* Traitement opérationnel ****************************************************/
        if (Agent_vars->mode == TINFO_WAIT_BEFORE_RETRY)
-        { if (Agent_vars->next_retry_top <= Agent->Top)
+        { if (Agent_vars->next_retry_top <= Agent_get_top ( Agent ))
            { Agent_vars->mode = TINFO_RETRYING;
              Agent_vars->next_retry_top = 0;
-             Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_NOTICE, "Retrying teleinfo connection" );
+             Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_NOTICE, "Retrying teleinfo connection" );
            }
         }
        else if (Agent_vars->mode == TINFO_RETRYING)
         { if (Init_teleinfo() < 0)
-           { Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR,
+           { Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR,
                    "Init teleinfo failed, retrying in %us", (TINFO_RETRY_DELAI / 10) );
              Agent_vars->mode = TINFO_WAIT_BEFORE_RETRY;
-             Agent_vars->next_retry_top = Agent->Top + TINFO_RETRY_DELAI;
+             Agent_vars->next_retry_top = Agent_get_top ( Agent ) + TINFO_RETRY_DELAI;
            }
           else
            { Agent_vars->mode = TINFO_CONNECTED;
-             Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_INFO, "Teleinfo connected (fd=%d)", Agent_vars->fd );
+             Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_INFO, "Teleinfo connected (fd=%d)", Agent_vars->fd );
            }
         }
 
@@ -286,22 +286,22 @@
              else
               { Agent_vars->nbr_octet_lu = 0;
                 memset(Agent_vars->buffer, 0, sizeof(Agent_vars->buffer));
-                Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR, "Buffer overflow, dropping frame" );
+                Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR, "Buffer overflow, dropping frame" );
               }
            }
         }
 
-       if ( Agent_vars->next_file_check_top <= Agent->Top )      /* Si pb FD ou débranchage USB -> test toutes les 10 secondes */
+       if ( Agent_vars->next_file_check_top <= Agent_get_top ( Agent ) )      /* Si pb FD ou débranchage USB -> test toutes les 10 secondes */
         { gboolean closing_needed = FALSE;
           struct stat buf;
 
           if (fstat(Agent_vars->fd, &buf) == -1)
-           { Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR,
+           { Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR,
                    "fstat failed (%s), reconnect in %us", strerror(errno), (TINFO_RETRY_DELAI / 10) );
              closing_needed = TRUE;
            }
           else if (buf.st_nlink < 1)
-           { Info( __func__, Agent->agent_classe, Agent->agent_tech_id, LOG_ERR,
+           { Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR,
                    "USB device disappeared, reconnect in %us", (TINFO_RETRY_DELAI / 10) );
              closing_needed = TRUE;
            }
@@ -310,10 +310,10 @@
            { close(Agent_vars->fd);
              Agent_vars->fd = -1;
              Agent_vars->mode = TINFO_WAIT_BEFORE_RETRY;
-             Agent_vars->next_retry_top = Agent->Top + TINFO_RETRY_DELAI;
+             Agent_vars->next_retry_top = Agent_get_top ( Agent ) + TINFO_RETRY_DELAI;
              Agent_send_comm_to_master(Agent, FALSE);
            }
-          Agent_vars->next_file_check_top = Agent->Top + 100;                                  /* Test toutes les 10 secondes */
+          Agent_vars->next_file_check_top = Agent_get_top ( Agent ) + 100;                                  /* Test toutes les 10 secondes */
         }
      }
 
