@@ -232,8 +232,8 @@
        JsonNode *mqtt_api_message;
        while ( (mqtt_api_message = Agent_get_mqtt_api_message ( Agent ) ) != NULL )
         { if ( Mqtt_topic_is ( mqtt_api_message, 4, "+", "AGENT", Agent->agent_tech_id, "TEST" ) )
-          { Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_NOTICE, "Test from Master."); }
-         Json_unref (mqtt_api_message);
+           { Info(__func__, Agent->agent_classe, Agent->agent_tech_id, LOG_NOTICE, "Agent Test from API."); }
+          Json_unref (mqtt_api_message);
         }
 /************************************************* Traitement opérationnel ****************************************************/
        if (Agent_vars->mode == TINFO_WAIT_BEFORE_RETRY)

@@ -94,6 +94,9 @@
     JsonNode *PRM;
   };
 
+ extern struct ABLS_AGENT *Agent;
+ extern struct ABLS_TELEINFOEDF_VARS *Agent_vars;
+
  #endif
 
 /******************************************************************************************************************************/
