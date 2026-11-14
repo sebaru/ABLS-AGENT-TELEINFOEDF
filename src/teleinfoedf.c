@@ -256,7 +256,7 @@
            }
         }
 
-       if (Agent_vars->mode != TINFO_CONNECTED) { sleep(1); continue; }
+       if (Agent_vars->mode != TINFO_CONNECTED) { g_usleep( G_USEC_PER_SEC*1 ); continue; }
 
        struct timeval tv;
        fd_set fdselect;
@@ -264,24 +264,23 @@
        FD_SET(Agent_vars->fd, &fdselect);
        tv.tv_sec = 1;
        tv.tv_usec = 0;
-       gint retval = select(Agent_vars->fd + 1, &fdselect, NULL, NULL, &tv);                        /* Attente d'un caractere */
 
-       if (retval >= 0 && FD_ISSET(Agent_vars->fd, &fdselect))
+       while ( select(Agent_vars->fd + 1, &fdselect, NULL, NULL, &tv) >= 0 && FD_ISSET(Agent_vars->fd, &fdselect) )
         { gint cpt = read(Agent_vars->fd, ((unsigned char *)Agent_vars->buffer) + Agent_vars->nbr_octet_lu, 1);
           if (cpt > 0)
-           { if (Agent_vars->buffer[Agent_vars->nbr_octet_lu] == '\n')                                           /* Process de la trame ? */
-              { Agent_vars->buffer[Agent_vars->nbr_octet_lu] = 0;                                               /* Caractère fin de trame */
+           { if (Agent_vars->buffer[Agent_vars->nbr_octet_lu] == '\n')                               /* Process de la trame ? */
+              { Agent_vars->buffer[Agent_vars->nbr_octet_lu] = 0;                                   /* Caractère fin de trame */
                 Processer_trame();
                 Agent_vars->nbr_octet_lu = 0;
                 memset(Agent_vars->buffer, 0, sizeof(Agent_vars->buffer));
                 Agent_send_comm_to_master(Agent, TRUE);
               }
-             else if (Agent_vars->nbr_octet_lu + cpt < TAILLE_BUFFER_TELEINFO)                  /* Encore en dessous de la limite ? */
-              { if (Agent_vars->mode_standard)                                                              /* Change \t and \r into null */
+             else if (Agent_vars->nbr_octet_lu + cpt < TAILLE_BUFFER_TELEINFO)            /* Encore en dessous de la limite ? */
+              { if (Agent_vars->mode_standard)                                                  /* Change \t and \r into null */
                  {      if (Agent_vars->buffer[Agent_vars->nbr_octet_lu] == '\t') { Agent_vars->buffer[Agent_vars->nbr_octet_lu] = 0; }
                    else if (Agent_vars->buffer[Agent_vars->nbr_octet_lu] == '\r') { Agent_vars->buffer[Agent_vars->nbr_octet_lu] = 0; }
                  }
-                Agent_vars->nbr_octet_lu += cpt;                                               /* Preparation du prochain caractere */
+                Agent_vars->nbr_octet_lu += cpt;                                         /* Preparation du prochain caractere */
               }
              else
               { Agent_vars->nbr_octet_lu = 0;
