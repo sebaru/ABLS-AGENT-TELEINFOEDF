@@ -220,6 +220,7 @@
     Agent_subscribe_mqtt_local ( Agent, "SYNC_INPUT/%s", Agent_get_tech_id ( Agent ));
 
     Agent_is_ready (Agent);
+    gboolean closing_needed = FALSE;
 
     while (Agent_is_running ( Agent ))
      { Agent_loop ( Agent );
@@ -256,14 +257,14 @@
            }
         }
 
-       if (Agent_vars->mode != TINFO_CONNECTED) { g_usleep( G_USEC_PER_SEC*1 ); continue; }
+       if (Agent_vars->mode != TINFO_CONNECTED) { continue; }
 
        struct timeval tv;
+       tv.tv_sec  = 0;
+       tv.tv_usec = 1000;
        fd_set fdselect;
        FD_ZERO(&fdselect);
        FD_SET(Agent_vars->fd, &fdselect);
-       tv.tv_sec = 1;
-       tv.tv_usec = 0;
 
        while ( select(Agent_vars->fd + 1, &fdselect, NULL, NULL, &tv) >= 0 && FD_ISSET(Agent_vars->fd, &fdselect) )
         { gint cpt = read(Agent_vars->fd, ((unsigned char *)Agent_vars->buffer) + Agent_vars->nbr_octet_lu, 1);
@@ -287,12 +288,11 @@
                 memset(Agent_vars->buffer, 0, sizeof(Agent_vars->buffer));
                 Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR, "Buffer overflow, dropping frame" );
               }
-           }
+           } else if (cpt < 0) { closing_needed = TRUE; break; }                                       /* erreur a la lecture */
         }
 
        if ( Agent_vars->next_file_check_top <= Agent_get_top ( Agent ) )      /* Si pb FD ou débranchage USB -> test toutes les 10 secondes */
-        { gboolean closing_needed = FALSE;
-          struct stat buf;
+        { struct stat buf;
 
           if (fstat(Agent_vars->fd, &buf) == -1)
            { Info( __func__, Agent_get_classe ( Agent ), Agent_get_tech_id ( Agent ), LOG_ERR,
@@ -305,14 +305,16 @@
              closing_needed = TRUE;
            }
 
-          if (closing_needed == TRUE)
-           { close(Agent_vars->fd);
-             Agent_vars->fd = -1;
-             Agent_vars->mode = TINFO_WAIT_BEFORE_RETRY;
-             Agent_vars->next_retry_top = Agent_get_top ( Agent ) + TINFO_RETRY_DELAI;
-             Agent_send_comm_to_master(Agent, FALSE);
-           }
-          Agent_vars->next_file_check_top = Agent_get_top ( Agent ) + 100;                                  /* Test toutes les 10 secondes */
+          Agent_vars->next_file_check_top = Agent_get_top ( Agent ) + 100;                     /* Test toutes les 10 secondes */
+        }
+
+       if (closing_needed == TRUE)                                             /* Prend en compte les deconnexions sur erreur */
+        { close(Agent_vars->fd);
+          Agent_vars->fd = -1;
+          Agent_vars->mode = TINFO_WAIT_BEFORE_RETRY;
+          Agent_vars->next_retry_top = Agent_get_top ( Agent ) + TINFO_RETRY_DELAI;
+          Agent_send_comm_to_master(Agent, FALSE);
+          closing_needed = FALSE;
         }
      }
 
